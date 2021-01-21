@@ -580,11 +580,11 @@ spec:
           name: https
       - args:
         - --metrics-bind-addr=127.0.0.1:8080
-        - --enable-leader-election
+        - --leader-elect
         - --feature-gates=MachinePool=${EXP_MACHINE_POOL:=false}
         command:
         - /manager
-        image: quay.io/dongsupark/eks-bootstrap-controller-amd64:dev
+        image: quay.io/dongsupark/eks-bootstrap-controller-amd64:dev2021
         imagePullPolicy: Always
         name: manager
       metadata:

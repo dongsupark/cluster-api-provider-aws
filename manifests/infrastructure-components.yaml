@@ -3928,12 +3928,12 @@ spec:
       containers:
       - args:
         - --metrics-bind-addr=127.0.0.1:8080
-        - --enable-leader-election
+        - --leader-elect
         - --feature-gates=EKS=${EXP_EKS:=false},MachinePool=${EXP_MACHINE_POOL:=false}
         env:
         - name: AWS_SHARED_CREDENTIALS_FILE
           value: /home/.aws/credentials
-        image: quay.io/dongsupark/cluster-api-aws-controller-amd64:dev
+        image: quay.io/dongsupark/cluster-api-aws-controller-amd64:dev2021
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -4001,7 +4001,7 @@ spec:
         - --metrics-bind-addr=127.0.0.1:8080
         - --webhook-port=9443
         - --feature-gates=EKS=${EXP_EKS:=false},MachinePool=${EXP_MACHINE_POOL:=false}
-        image: quay.io/dongsupark/cluster-api-aws-controller-amd64:dev
+        image: quay.io/dongsupark/cluster-api-aws-controller-amd64:dev2021
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

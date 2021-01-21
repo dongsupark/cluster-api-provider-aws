@@ -1664,14 +1664,14 @@ spec:
       containers:
       - args:
         - --metrics-bind-addr=127.0.0.1:8080
-        - --enable-leader-election
+        - --leader-elect
         - --feature-gates=EKSEnableIAM=${EXP_EKS_IAM:=false},EKSAllowAddRoles=${EXP_EKS_ADD_ROLES:=false}
         command:
         - /manager
         env:
         - name: AWS_SHARED_CREDENTIALS_FILE
           value: /home/.aws/credentials
-        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev
+        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev2021
         imagePullPolicy: Always
         name: manager
         volumeMounts:
@@ -1728,7 +1728,7 @@ spec:
         - --webhook-port=9443
         command:
         - /manager
-        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev
+        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev2021
         imagePullPolicy: Always
         name: manager
         ports:
