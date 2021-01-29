@@ -14,6 +14,7 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.4.1-0.20201002000720-57250aac17f6
   labels:
     cluster.x-k8s.io/provider: control-plane-eks
+    cluster.x-k8s.io/v1alpha3: v1alpha3
     cluster.x-k8s.io/v1alpha4: v1alpha4
   name: awsmanagedcontrolplanes.controlplane.cluster.x-k8s.io
 spec:
@@ -84,6 +85,10 @@ spec:
                   type: string
                 description: AdditionalTags is an optional set of tags to add to AWS resources managed by the AWS provider, in addition to the ones added by default.
                 type: object
+              associateOIDCProvider:
+                default: false
+                description: AssociateOIDCProvider can be enabled to automatically create an identity provider for the controller for use with IAM roles for service accounts
+                type: boolean
               bastion:
                 description: Bastion contains options to configure the bastion host.
                 properties:
@@ -213,7 +218,7 @@ spec:
                 properties:
                   apiServer:
                     default: false
-                    description: APIServer indicates if the Kubernetes API Server log (kube-apiserver) should be enabled
+                    description: APIServer indicates if the Kubernetes API Server log (kube-apiserver) shoulkd be enabled
                     type: boolean
                   audit:
                     default: false
@@ -340,6 +345,9 @@ spec:
               roleName:
                 description: RoleName specifies the name of IAM role that gives EKS permission to make API calls. If the role is pre-existing we will treat it as unmanaged and not delete it on deletion. If the EKSEnableIAM feature flag is true and no name is supplied then a role is created.
                 minLength: 2
+                type: string
+              secondaryCidrBlock:
+                description: SecondaryCidrBlock is the additional CIDR range to use for pod IPs. Must be within the 100.64.0.0/10 or 198.19.0.0/16 range.
                 type: string
               sshKeyName:
                 description: SSHKeyName is the name of the ssh key to attach to the bastion host. Valid values are empty string (do not use SSH keys), a valid SSH key name, or omitted (use the default SSH key name)
@@ -707,6 +715,16 @@ spec:
                       type: object
                     description: SecurityGroups is a map from the role/kind of the security group to its unique name, if any.
                     type: object
+                type: object
+              oidcProvider:
+                description: OIDCProvider holds the status of the identity provider for this cluster
+                properties:
+                  arn:
+                    description: ARN holds the ARN of the provider
+                    type: string
+                  trustPolicy:
+                    description: TrustPolicy contains the boilerplate IAM trust policy to use for IRSA
+                    type: string
                 type: object
               ready:
                 default: false
@@ -763,6 +781,10 @@ spec:
                   type: string
                 description: AdditionalTags is an optional set of tags to add to AWS resources managed by the AWS provider, in addition to the ones added by default.
                 type: object
+              associateOIDCProvider:
+                default: false
+                description: AssociateOIDCProvider can be enabled to automatically create an identity provider for the controller for use with IAM roles for service accounts
+                type: boolean
               bastion:
                 description: Bastion contains options to configure the bastion host.
                 properties:
@@ -892,7 +914,7 @@ spec:
                 properties:
                   apiServer:
                     default: false
-                    description: APIServer indicates if the Kubernetes API Server log (kube-apiserver) should be enabled
+                    description: APIServer indicates if the Kubernetes API Server log (kube-apiserver) shoulkd be enabled
                     type: boolean
                   audit:
                     default: false
@@ -1019,6 +1041,9 @@ spec:
               roleName:
                 description: RoleName specifies the name of IAM role that gives EKS permission to make API calls. If the role is pre-existing we will treat it as unmanaged and not delete it on deletion. If the EKSEnableIAM feature flag is true and no name is supplied then a role is created.
                 minLength: 2
+                type: string
+              secondaryCidrBlock:
+                description: SecondaryCidrBlock is the additional CIDR range to use for pod IPs. Must be within the 100.64.0.0/10 or 198.19.0.0/16 range.
                 type: string
               sshKeyName:
                 description: SSHKeyName is the name of the ssh key to attach to the bastion host. Valid values are empty string (do not use SSH keys), a valid SSH key name, or omitted (use the default SSH key name)
@@ -1386,6 +1411,16 @@ spec:
                       type: object
                     description: SecurityGroups is a map from the role/kind of the security group to its unique name, if any.
                     type: object
+                type: object
+              oidcProvider:
+                description: OIDCProvider holds the status of the identity provider for this cluster
+                properties:
+                  arn:
+                    description: ARN holds the ARN of the provider
+                    type: string
+                  trustPolicy:
+                    description: TrustPolicy contains the boilerplate IAM trust policy to use for IRSA
+                    type: string
                 type: object
               ready:
                 default: false
@@ -1526,8 +1561,35 @@ rules:
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
+  - awsmachinepools
+  - awsmachinepools/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - awsmachines
+  - awsmachines/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
   - awsmanagedclusters
   - awsmanagedclusters/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - awsmanagedmachinepools
+  - awsmanagedmachinepools/status
   verbs:
   - get
   - list
@@ -1566,7 +1628,7 @@ roleRef:
   name: capa-eks-control-plane-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: capa-eks-control-plane-controller-manager
   namespace: capa-eks-control-plane-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1665,14 +1727,15 @@ spec:
       - args:
         - --metrics-bind-addr=127.0.0.1:8080
         - --leader-elect
-        - --feature-gates=EKSEnableIAM=${EXP_EKS_IAM:=false},EKSAllowAddRoles=${EXP_EKS_ADD_ROLES:=false}
+        - --feature-gates=EKSEnableIAM=${EXP_EKS_IAM:=false},EKSAllowAddRoles=${EXP_EKS_ADD_ROLES:=false},MachinePool=${EXP_MACHINE_POOL:=false}
+        - --v=${EKS_CP_LOGLEVEL:=4}
         command:
         - /manager
         env:
         - name: AWS_SHARED_CREDENTIALS_FILE
           value: /home/.aws/credentials
-        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev2021
-        imagePullPolicy: Always
+        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev
+        imagePullPolicy: IfNotPresent
         name: manager
         volumeMounts:
         - mountPath: /home/.aws
@@ -1728,8 +1791,8 @@ spec:
         - --webhook-port=9443
         command:
         - /manager
-        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev2021
-        imagePullPolicy: Always
+        image: quay.io/dongsupark/eks-controlplane-controller-amd64:dev
+        imagePullPolicy: IfNotPresent
         name: manager
         ports:
         - containerPort: 9443
