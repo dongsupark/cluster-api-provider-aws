@@ -1663,8 +1663,8 @@ spec:
     spec:
       containers:
       - args:
-        - --metrics-bind-addr=127.0.0.1:8080
-        - --leader-elect
+        - --metrics-addr=127.0.0.1:8080
+        - --enable-leader-election
         - --feature-gates=EKSEnableIAM=${EXP_EKS_IAM:=false},EKSAllowAddRoles=${EXP_EKS_ADD_ROLES:=false}
         command:
         - /manager
@@ -1724,7 +1724,7 @@ spec:
     spec:
       containers:
       - args:
-        - --metrics-bind-addr=127.0.0.1:8080
+        - --metrics-addr=127.0.0.1:8080
         - --webhook-port=9443
         command:
         - /manager
